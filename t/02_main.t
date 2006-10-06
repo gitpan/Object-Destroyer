@@ -1,27 +1,16 @@
 #!/usr/bin/perl -w
 
-# Formal testing for Object::Destroyer
+# Primary testing for Object::Destroyer
 
 use strict;
-use File::Spec::Functions qw{:ALL};
-use lib catdir( updir(), updir(), 'modules' ), # Development testing
-        catdir( updir(), 'lib' );              # Installation testing
-use UNIVERSAL 'isa';
-use Test::More tests => 19;
-use Scalar::Util 'blessed';
-
-# Check their perl version
 BEGIN {
-	$| = 1;
-	ok( $] >= 5.005, "Your perl is new enough" );		
+	$|  = 1;
+	$^W = 1;
 }
 
-
-
-
-
-# Does the module load
-use_ok( 'Object::Destroyer' );
+use Test::More tests => 17;
+use Scalar::Util 'blessed';
+use Object::Destroyer;
 
 # Make sure a plain Foo object pair behaves as expected
 is( $Foo::destroy_counter, 0, 'DESTROY counter returns expected value' );

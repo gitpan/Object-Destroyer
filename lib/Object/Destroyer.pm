@@ -2,19 +2,16 @@ package Object::Destroyer;
 
 # See POD at end for details
 
+use 5.005;
 use strict;
-use UNIVERSAL ();
-use Carp 'croak';
+use UNIVERSAL    ();
+use Carp         ();
 use Scalar::Util ();
 
 use vars qw{$VERSION};
 BEGIN {
-	$VERSION = '0.1';
+	$VERSION = '1.02';
 }
-
-
-
-
 
 sub new {
 	if ( ref $_[0] ) {
@@ -28,12 +25,12 @@ sub new {
 	# *ahem*... where were we...
 	my $destroyer = shift;
 	my $class = Scalar::Util::blessed($_[0])
-		or croak "Did not pass Object::Destroyer->new an object";
+		or Carp::croak "Did not pass Object::Destroyer->new an object";
 
 	# The encased object must have a DESTROY method we can call.
 	# Otherwise there's no point in doing this.
 	unless ( UNIVERSAL::can( $class, 'DESTROY' ) ) {
-		croak "Object::Destroyer requires that $class has a DESTROY method";
+		Carp::croak "Object::Destroyer requires that $class has a DESTROY method";
 	}
 
 	# Create the object
@@ -56,7 +53,7 @@ sub AUTOLOAD {
 
 	# Bad method call... since this is probably going to die
 	# anyway, we don't care about appearing in the call stack.
-	croak "Can't locate object method \"$method\" via package \"" . ref($_[0]) . '"';
+	Carp::croak "Can't locate object method \"$method\" via package \"" . ref($_[0]) . '"';
 }
 
 # Use our automatically triggered DESTROY to call the
@@ -123,8 +120,8 @@ Object::Destroyer - Make objects with circular references DESTROY normally
 =head1 DESCRIPTION
 
 One of the biggest problem with working with large, nested object trees is
-implementing a way for a child node to see it's parent. The easiest way to
-do this is to add a reference to the child back to it's parent.
+implementing a way for a child node to see its parent. The easiest way to
+do this is to add a reference to the child back to its parent.
 
 This results in a "circular" reference, where A refers to B refers to A.
 Unfortunately, the garbage collector perl uses during runtime is not capable
@@ -295,19 +292,18 @@ could just run-time load as needed. Any suggestions?
 
 Bugs should be reported via the CPAN bug tracker at
 
-  http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Object%3A%3ADestroyer
+L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Object-Destroyer>
 
-For other issues, contact the author
+For other issues, or commercial enhancement or support, contact the author.
 
 =head1 AUTHOR
 
-        Adam Kennedy
-        cpan@ali.as
-        http://ali.as/
+Adam Kennedy E<lt>adamk@cpan.orgE<gt>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2004 Adam Kennedy. All rights reserved.
+Copyright 2004 - 2006 Adam Kennedy.
+
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
 
