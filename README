@@ -5,38 +5,40 @@ NAME
 SYNOPSIS
       use Object::Destroyer;
   
+      ## Use a standalone destroyer to release something 
+      ## when it falls out of scope
+      BLOCK: 
       {
-          # Use a standalone destroyer to destroy something when it falls out of scope
-          my $Tree = Big::Crustry::Tree->parse('somefile.txt');
-          my $Cleaner = Object::Destroyer->new( $Tree );
+          my $tree = HTML::TreeBuilder->new_from_file('somefile.html');
+          my $sentry = Object::Destroyer->new( $tree, 'delete' );
+          ## Here you can safely die, return, call last BLOCK or next BLOCK.
+          ## The tree will be deleted automatically
       }
-  
+
+      ## Use it to break circular references
       {
-          # Or we can use the destroyer as a near transparent wrapper
-          # that will pass on method calls normally.
+          my $var;
+          $var = \$var;
+          my $sentry =  Object::Destroyer->new( sub {undef $var} );
+          ## No more memory leaks!
+          ## $var will be released when $sentry leaves the block
+      }
+
+      ## Destroyer can be used as a nearly transparent wrapper
+      ## that will pass on method calls normally.
+      {
           my $Mess = Big::Custy::Mess->new;
           print $Mess->hello;
       }
   
       package Big::Crusty::Mess;
-  
       sub new {
           my $self = bless {}, shift;
-  
-          $self->populate_with_stuff;
-  
-          return Object::Destroyer->new( $self );
+          $self->populate;
+          return Object::Destroyer->new( $self, 'release' );
       }
-  
       sub hello { "Hello World!" }
-  
-      sub DESTROY {
-          foreach my $child ( values %$self ) {
-              $child->DESTROY;
-          }
-  
-          %$self = ();
-      }
+      sub release { ...actual code to clean-up the memory... }
 
 DESCRIPTION
     One of the biggest problem with working with large, nested object trees
@@ -45,7 +47,7 @@ DESCRIPTION
 
     This results in a "circular" reference, where A refers to B refers to A.
     Unfortunately, the garbage collector perl uses during runtime is not
-    capable of knowing whether or not something ELSE is refering to these
+    capable of knowing whether or not something ELSE is referring to these
     circular references.
 
     In practical terms, this means that object trees in lexically scoped
@@ -57,44 +59,68 @@ DESCRIPTION
     Object::Destroyer allows for the creation of "Destroy" handles. The
     handle is "attached" to the circular relationship, but is not a part of
     it. When the destroy handle falls out of scope, it will be cleaned up
-    correctly, and while being cleaned up, it will also force the object it
-    is attached to to be destroyed as well.
+    correctly, and while being cleaned up, it will also force the data
+    structure it is attached to to be destroyed as well. Object::Destroyer
+    can call a specified release method on an object (or method DESTROY by
+    default). Alternatively, it can execute an arbitrary user code passed to
+    constructor as a code reference.
 
   Use as a Standalone Handle
     The simplest way to use the class is to create a standalone destroyer,
-    preferably in the same lexical content. ( i.e. Immediately after
-    creating the parent object )
+    preferably in the same lexical content. ( i.e. immediately after
+    creating the object to be destroyed)
 
       sub plagiarise {
         # Parse in a large nested document
         my $filename = shift;
-        my $Document = My::XML::Tree->open( $filename );
+        my $document = My::XML::Tree->open($filename);
   
         # Create the Object::Destroyer to clean it up as needed
-        my $Cleaner = Object::Destroyer->new( $Document );
+        my $sentry = Object::Destroyer->new( $document, 'release' );
   
         # Continue with the Document as normal
-        if ( $Document->author == $me ) {
+        if ($document->author == $me) {
             # Normally this would have leaked the document
             return new Error("You already own the Document");
         }
     
-        $Document->change_author( $me );
-        $Document->save;
+        $document->change_author($me);
+        $document->save;
 
         # We don't have to $Document->DESTROY here
         return 1;
       }
 
-    When the Cleaner falls out of scope at the end of the sub, it will force
+    When the $sentry falls out of scope at the end of the sub, it will force
     the cirularly linked $Document to be cleaned up at the same time, rather
-    than being forced to manually call "$Document-"DESTROY> at each and
+    than being forced to manually call "$Document-<gt"release> at each and
     every location that the sub could possible return.
 
     Using the Object::Destroy object to force garbage collection to work
     properly allows you to neatly sidestep the inadequecies of the perl
     garbage collector and work the way you normally would, even with big
     objects.
+
+  Use to clean-up data structures
+    If a data structure with circular refereces has no method to release
+    memory, you can create an "Object::Destroyer" object that will do the
+    job. Pass a code reference (most probably created by an anonymous
+    subrotine block) to the constructor of the sentry object, and this code
+    will be called upon leaving the scope.
+
+      {
+         $params{other}        = \%other_params;
+         $other_params{params} = \%params;
+
+         my $sentry = Object::Destroyer->new( sub {undef $params{other}} );
+         ##
+         ## From now on, memory of %params will be 
+         ## safely released when block is exited.
+         ##
+
+         ... code with return, next or last ...
+          
+      }
 
   Use as a Transparent Wrapper
     For situations where a class is always going to produce circular
@@ -111,26 +137,16 @@ DESCRIPTION
   
       sub new {
           my $self = bless {}, shift;
-      
-          ###
-          ### Initialise with big nasty circular references
-          ###
-      
-          # Return the Object::Destroyer, with ourself inside it
-          my $Wrapper = Object::Destroyer->new( $self );
-          return $Wrapper;
+          $self->init; ## assume that circular references are made
+
+          ## Return the Object::Destroyer, with ourself inside it
+          my $wrapper = Object::Destroyer->new( $self, 'release' );
+          return $wrapper;
       }
   
-      sub param {
+      sub release {
             my $self = shift;
-            return $self->{CGI}->param(@_);
-      }
-  
-      ... code ...
-  
-      sub DESTROY {
-            my $self = shift;
-            foreach ( values %$self ) {
+            foreach (values %$self) {
                     $_->DESTROY if ref $_ eq 'My::Tree::Node';
             }
             %$self = ();
@@ -140,17 +156,18 @@ DESCRIPTION
 
       sub process_file {
           # Create a new tree
-          my $Tree = My::Tree->new( source => shift );
+          my $tree = My::Tree->new( source => shift );
   
           # Process the Tree
-          if ( $Tree->comments ) {
-              $Tree->remove_comments or return;
-          } else {
+          if ($tree->comments) {
+              $tree->remove_comments or return;
+          } 
+          else {
               return 1; # Nothing to do
           }
   
-          my $filename = $Tree->param('target') or return;
-          $Tree->write( $filename ) or return;
+          my $filename = $tree->param('target') or return;
+          $tree->write($filename) or return;
   
           return 1;
       }
@@ -158,13 +175,6 @@ DESCRIPTION
     We were able to work with the data, and at no point did we know that we
     were working with a Object::Destroyer object, rather than the My::Tree
     object itself.
-
-  Encased Objects Must Have a DESTROY Method
-    At this time, the DESTROY method of the underlying object is the ONLY
-    way that the it can be destroyed. In order to use Object::Destroyer, the
-    object to be destroyed must have a DESTROY method. This is checked each
-    time a destroyer is created and an error will be thrown if it does not
-    have one.
 
   Resource Usage
     To implement the transparency, there is a slight CPU penalty when a
@@ -176,45 +186,54 @@ DESCRIPTION
 
   Problems with Wrappers and ref or UNIVERSAL::isa
     Although it may ACT exactly like what's inside it, is isn't really it.
-    Calling "ref $Wrapper" or "blessed $Wrapper" will return
+    Calling "ref $wrapper" or "blessed $wrapper" will return
     'Object::Destroyer', and not the class of the object inside it.
 
-    Likewise, calling "UNIVERSAL::isa( $Wrapper, 'My::Tree' )" or
-    "UNIVERSAL::can( $Wrapper, 'param' )" directly as functions will also
+    Likewise, calling "UNIVERSAL::isa( $wrapper, 'My::Tree' )" or
+    "UNIVERSAL::can( $wrapper, 'param' )" directly as functions will also
     not work. The two alternatives to this are to either use "$Wrapper->isa"
-    or "$Wrapper->can", which will be caught and treated normally, or simple
+    or "$wrapper->can", which will be caught and treated normally, or simple
     don't use a wrapper and just use the standalone cleaners.
 
 METHODS
-  new $Object
-    The "new" constructor takes as argument a single blessed object, and
-    returns a new Object::Destroyer object, linked to it. The method will
-    die if passed nothing or anything other than an object. The method will
-    also die if the object passed to it does not have a DESTROY function.
+    new
+          my $sentry = Object::Destroyer->new( $object );
+          my $sentry = Object::Destroyer->new( $object, 'method_name' );
+          my $sentry = Object::Destroyer->new( $code_reference );
+ 
+        The "new" constructor takes as arguments either a single blessed
+        object with an optional name of the method to be called, or a
+        refernce to code to be executed. If the method name is not
+        specified, the "DESTROY" method is assumed. The constructor will die
+        if the object passed to it does not have the specified method.
 
-  DESTROY
-    If you wish, you may explicitly DESTROY the Destroyer at any time you
-    wish. This will also DESTROY the encased object at the same. This can
-    allow for legacy cases relating to Wrappers, where a user expects to
-    have to manually DESTROY an object even though it is not needed. The
-    DESTROY call will be accepted and dealt with as it he called it on the
-    encased object.
+    DESTROY
+          $sentry->DESTROY;
+          undef $sentry;
 
-TO DO
-    Remove the requirement for a DESTROY by adding the option of a struct
-    crawling manual dereferencer. There's probably one somewhere in CPAN we
-    could just run-time load as needed. Any suggestions?
+        If you wish, you may explicitly DESTROY the Destroyer at any time
+        you wish. This will also DESTROY the encased object at the same.
+        This can allow for legacy cases relating to Wrappers, where a user
+        expects to have to manually DESTROY an object even though it is not
+        needed. The DESTROY call will be accepted and dealt with as it is
+        called on the encased object.
+
+SEE ALSO
+    Another option for dealing with circular references are "weak
+    references" (stable since Perl 5.8.0, see Scalar::Util). See also
+    GTop::Mem and Devel::Monitor for monitoring memory leaks. The latter
+    module contains a discussion on object desing with weak references.
 
 SUPPORT
     Bugs should be reported via the CPAN bug tracker at
 
     <http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Object-Destroyer>
 
-    For other issues, or commercial enhancement or support, contact the
-    author.
+    For other issues, or commercial enhancement or support, contact the Adam
+    Kennedy.
 
-AUTHOR
-    Adam Kennedy <adamk@cpan.org>
+AUTHORS
+    Adam Kennedy <adamk@cpan.org> and Igor Gariev <gariev@hotmail.com>
 
 COPYRIGHT
     Copyright 2004 - 2006 Adam Kennedy.
