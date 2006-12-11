@@ -17,4 +17,5 @@ t/01_compile.t
 t/02_new.t
 t/03_destroy.t
 t/04_wrapper.t
+t/05_dismiss.t
 t/99_author.t

@@ -145,11 +145,11 @@ DESCRIPTION
       }
   
       sub release {
-            my $self = shift;
-            foreach (values %$self) {
-                    $_->DESTROY if ref $_ eq 'My::Tree::Node';
-            }
-            %$self = ();
+        my $self = shift;
+        foreach (values %$self) {
+            $_->DESTROY if ref $_ eq 'My::Tree::Node';
+        }
+        %$self = ();
       }
 
     We might use the class in something like this
@@ -218,11 +218,21 @@ METHODS
         needed. The DESTROY call will be accepted and dealt with as it is
         called on the encased object.
 
+    dismiss
+          $sentry->dismiss;
+
+        If you have changed your mind and you don't want Destroyer object to
+        do its job, dismiss it. You may continue to use it as a wrapper,
+        though.
+
 SEE ALSO
     Another option for dealing with circular references are "weak
     references" (stable since Perl 5.8.0, see Scalar::Util). See also
     GTop::Mem and Devel::Monitor for monitoring memory leaks. The latter
     module contains a discussion on object desing with weak references.
+
+    For lexically scoped resource management, see also Scope::Guard,
+    Sub::ScopeFinalizer and Hook::Scope.
 
 SUPPORT
     Bugs should be reported via the CPAN bug tracker at
