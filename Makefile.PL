@@ -1,10 +1,5 @@
-use strict;
-use inc::Module::Install;
+use inc::Module::Install::DSL 1.00;
 
-name            'Object-Destroyer';
-all_from        'lib/Object/Destroyer.pm';
-requires        'Carp'          => 0; 
-build_requires  'Test::More'    => '0.42';
-
-WriteAll();
-
+name          Object-Destroyer
+all_from      lib/Object/Destroyer.pm
+test_requires Test::More 0.42

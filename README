@@ -4,8 +4,8 @@ NAME
 
 SYNOPSIS
       use Object::Destroyer;
-  
-      ## Use a standalone destroyer to release something 
+      
+  ## Use a standalone destroyer to release something 
       ## when it falls out of scope
       BLOCK: 
       {
@@ -30,8 +30,8 @@ SYNOPSIS
           my $Mess = Big::Custy::Mess->new;
           print $Mess->hello;
       }
-  
-      package Big::Crusty::Mess;
+      
+  package Big::Crusty::Mess;
       sub new {
           my $self = bless {}, shift;
           $self->populate;
@@ -74,17 +74,17 @@ DESCRIPTION
         # Parse in a large nested document
         my $filename = shift;
         my $document = My::XML::Tree->open($filename);
-  
-        # Create the Object::Destroyer to clean it up as needed
+      
+    # Create the Object::Destroyer to clean it up as needed
         my $sentry = Object::Destroyer->new( $document, 'release' );
-  
-        # Continue with the Document as normal
+      
+    # Continue with the Document as normal
         if ($document->author == $me) {
             # Normally this would have leaked the document
             return new Error("You already own the Document");
         }
-    
-        $document->change_author($me);
+        
+    $document->change_author($me);
         $document->save;
 
         # We don't have to $Document->DESTROY here
@@ -119,8 +119,8 @@ DESCRIPTION
          ##
 
          ... code with return, next or last ...
-          
-      }
+              
+  }
 
   Use as a Transparent Wrapper
     For situations where a class is always going to produce circular
@@ -131,11 +131,11 @@ DESCRIPTION
     Take the following example class
 
       package My::Tree;
-  
-      use strict;
+      
+  use strict;
       use Object::Destroyer;
-  
-      sub new {
+      
+  sub new {
           my $self = bless {}, shift;
           $self->init; ## assume that circular references are made
 
@@ -143,8 +143,8 @@ DESCRIPTION
           my $wrapper = Object::Destroyer->new( $self, 'release' );
           return $wrapper;
       }
-  
-      sub release {
+      
+  sub release {
         my $self = shift;
         foreach (values %$self) {
             $_->DESTROY if ref $_ eq 'My::Tree::Node';
@@ -157,19 +157,19 @@ DESCRIPTION
       sub process_file {
           # Create a new tree
           my $tree = My::Tree->new( source => shift );
-  
-          # Process the Tree
+      
+      # Process the Tree
           if ($tree->comments) {
               $tree->remove_comments or return;
           } 
           else {
               return 1; # Nothing to do
           }
-  
-          my $filename = $tree->param('target') or return;
+      
+      my $filename = $tree->param('target') or return;
           $tree->write($filename) or return;
-  
-          return 1;
+      
+      return 1;
       }
 
     We were able to work with the data, and at no point did we know that we
@@ -200,7 +200,7 @@ METHODS
           my $sentry = Object::Destroyer->new( $object );
           my $sentry = Object::Destroyer->new( $object, 'method_name' );
           my $sentry = Object::Destroyer->new( $code_reference );
- 
+
         The "new" constructor takes as arguments either a single blessed
         object with an optional name of the method to be called, or a
         refernce to code to be executed. If the method name is not
@@ -243,10 +243,12 @@ SUPPORT
     Kennedy.
 
 AUTHORS
-    Adam Kennedy <adamk@cpan.org> and Igor Gariev <gariev@hotmail.com>
+    Adam Kennedy <adamk@cpan.org>
+
+    Igor Gariev <gariev@hotmail.com>
 
 COPYRIGHT
-    Copyright 2004 - 2006 Adam Kennedy.
+    Copyright 2004 - 2011 Adam Kennedy.
 
     This program is free software; you can redistribute it and/or modify it
     under the same terms as Perl itself.
